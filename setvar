@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# author: Markiyan Hrynovets
+# source: https://github.com/mhrynovets/setvar-utility
+
+# to turn autocompletion:
+# - ensure, that executable bit is set - chmod a+x setvar
+# - add this file to PATH directory (for example $HOME/bin)
+# - add next line to $HOME/.bashrc:
+# complete -C setvar setvar
+# - to ensure, that all environment is ready - logout and login back to your user account
+
+if [ " $COMP_KEY" == " 9" ]; then
+  PARAMS=($COMP_LINE)
+  COUNT=${#PARAMS[@]}
+
+  # whitch file to use
+  if [ $1 == $3 ]; then
+    DIR="$2"
+    if [ " ${DIR: -1}" != " /" ]; then 
+      DIR="$2*"
+    fi
+    TARGETS=($(find $DIR -maxdepth 1 2>/dev/null))
+    if [ ${#TARGETS[@]} -eq 1 ] && [ -f ${TARGETS[0]} ]; then
+        echo "${TARGETS[0]}"
+    else
+      printf '%s\n' "${TARGETS[@]}"
+    fi
+
+  exit
+  fi
+
+  # what to do (methods)
+  if ([ $COUNT -eq 2 ] && [ " $2" == " " ]) || ([ $COUNT -eq 3 ] && [ " $2" != " " ]); then
+
+  echo "$(compgen -W "set unset show" "$2")"
+
+  elif [ $COUNT -gt 2 ] && [ -f ${PARAMS[1]} ]; then
+
+    while IFS= read -r LINE; do
+      pattern="^($2[^=]*)=(.*)"
+      if [[ $LINE =~ $pattern ]]; then
+        KEY=${BASH_REMATCH[1]}
+        VALUE=${BASH_REMATCH[2]}
+        # if [ " ${PARAMS[2]}" == " show" ]; then
+        #   echo "$KEY"
+        # else
+        #   echo "$KEY $VALUE"
+        # fi
+        echo "$KEY $VALUE"
+      fi
+    done <${PARAMS[1]}
+  fi
+
+  exit
+fi
+
+
+ENV_FILE="$1"
+ENV_COMMAND="$2"
+shift 2
+
+touch $ENV_FILE
+declare -A ARR
+
+while IFS= read -r LINE; do
+  pattern='^([^=]*)=(.*)'
+  [[ $LINE =~ $pattern ]]
+  KEY=${BASH_REMATCH[1]}
+  VALUE=${BASH_REMATCH[2]}
+  ARR[$KEY]=$VALUE
+done <$ENV_FILE
+
+case $ENV_COMMAND in
+
+  set)
+    ENV_PARAM=$1
+    shift
+    ENV_VALUE=$@
+    cat /dev/null > $ENV_FILE
+    ARR[$ENV_PARAM]=$ENV_VALUE
+    for KEY in ${!ARR[*]}
+    do
+      echo "$KEY=${ARR[$KEY]}" >> $ENV_FILE
+    done    
+    ;;
+
+  unset)
+    ENV_PARAM=$1
+    cat /dev/null > $ENV_FILE
+    for KEY in ${!ARR[*]}
+    do
+      if [ $KEY != $ENV_PARAM ]; then echo "$KEY=${ARR[$KEY]}" >> $ENV_FILE; fi
+    done
+    ;;
+
+  show)
+    if [ " $*" == " " ]; then
+      for KEY in ${!ARR[*]}
+      do
+        echo "$KEY=${ARR[$KEY]}"
+      done
+    else 
+      echo "${ARR[$1]}"
+    fi
+    ;;
+
+  *)
+    :
+    ;;
+esac
